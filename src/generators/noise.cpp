@@ -18,7 +18,7 @@ namespace titan {
         size.y = h;
         gradients.resize(w * h);
         for (int i = 0; i < w * h; ++i) {
-            gradients[i] = normalize(vec2::random(engine));
+            gradients[i] = random_unit_vec2(engine);
         }
     }
 
@@ -32,36 +32,53 @@ namespace titan {
 
     PerlinNoise::PerlinNoise(size_t seed) : seed(seed), random_engine(seed) {}
 
-    std::vector<unsigned char> PerlinNoise::get_buffer(size_t w, size_t h, size_t octaves) {
-        std::vector<unsigned char> buffer(w * h, 0);
+    std::vector<unsigned char> PerlinNoise::get_buffer(size_t size, size_t octaves) {
+        std::vector<unsigned char> buffer(size * size, 0);
         get_buffer(buffer.data(), w, h, octaves);
         return buffer;
     }
 
-    using u64 = unsigned long long;
-    using i64 = long long;
-    using u32 = unsigned int;
+    using u8 = unsigned char;
     using i32 = int;
+    using u32 = unsigned int;
+    using i64 = long long;
+    using u64 = unsigned long long;
     using f32 = float;
 
     struct Gradient_Grid {
-        std::vector<vec2> gradients;
-        u64 size;
+        vec2* gradients;
+        u8 gradients_size;
+        u8* perm_table;
+        u8 perm_table_size;
 
         vec2 at(u64 const x, u64 const y) const {
-            return gradients[y * size + x];
+            u8 const index = (y % perm_table_size + x) % perm_table_size;
+            return gradients[perm_table[index] % gradients_size];
         }
     };
 
-    static Gradient_Grid generate_gradients(u64 const size, std::mt19937& random_engine) {
-        u64 const s = (size + 1) * (size + 1);
+    static Gradient_Grid create_gradient_grid(u64 const size, std::mt19937& random_engine) {
         Gradient_Grid grid;
-        grid.gradients.reserve(s);
-        grid.size = size + 1;
-        for (int i = 0; i < s; ++i) {
-            grid.gradients.push_back(normalize(vec2::random(random_engine)));
+        grid.gradients = reinterpret_cast<vec2*>(malloc(24 * sizeof(vec2)));
+        grid.gradients_size = 24;
+        grid.perm_table = reinterpret_cast<u8*>(malloc(128 * sizeof(u8)));
+        grid.perm_table_size = 128;
+
+        for (int i = 0; i < grid.gradients_size; ++i) {
+            grid.gradients[i] = random_unit_vec2(random_engine);
         }
+
+        std::uniform_int_distribution<u32> d(0, 255);
+        for (int i = 0; i < grid.perm_table_size; ++i) {
+            grid.perm_table[i] = d(random_engine);
+        }
+
         return grid;
+    }
+
+    static void destroy_gradient_grid(Gradient_Grid grid) {
+        free(grid.gradients);
+        free(grid.perm_table);
     }
 
     static float perlin_noise(float const x, float const y, vec2 const g00, vec2 const g10, vec2 const g01, vec2 const g11) {
@@ -90,7 +107,7 @@ namespace titan {
         f32 const persistence = 0.5f;
         f32 const size_f32 = size;
         u64 const size_4aligned = size & (~0x3);
-        Gradient_Grid const grid = generate_gradients(1 << (octaves - 1), random_engine);
+        Gradient_Grid const grid = create_gradient_grid(1 << (octaves - 1), random_engine);
 
         using namespace std::chrono;
         // _asm
@@ -127,7 +144,6 @@ namespace titan {
                         }
                     }
                 }
-
             } else {
                 for (u64 y = 0; y < size; ++y) {
                     f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
@@ -147,12 +163,11 @@ namespace titan {
             std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
             std::cout << "Octave " << octave << " ran in " << (end_time - start_time).count() << " ms" << std::endl;
         }
+        destroy_gradient_grid(grid);
     }
 
-    void PerlinNoise::get_buffer(unsigned char* buffer, size_t w, size_t h, size_t octaves) {
-        // w and h are the same because noise is always square.
-        // TODO: Rework interface.
-        generate_noise(buffer, w, octaves, random_engine);
+    void PerlinNoise::get_buffer(unsigned char* buffer, size_t size, size_t octaves) {
+        generate_noise(buffer, size, octaves, random_engine);
     }
 
     static float perlin_lerp(float a0, float a1, float x) {

@@ -8,15 +8,15 @@ namespace titan::math {
 
     struct vec2 {
         float x = 0, y = 0;
-
-        template <typename RandEngine>
-        static vec2 random(RandEngine& engine) {
-            float angle = ::titan::math::random(0, 2 * pi, engine);
-            float x = std::cos(angle);
-            float y = std::sin(angle);
-            return {x, y};
-        }
     };
+
+    template <typename RandEngine>
+    static vec2 random_unit_vec2(RandEngine& engine) {
+        float angle = ::titan::math::random(0, 2 * pi, engine);
+        float x = std::cos(angle);
+        float y = std::sin(angle);
+        return {x, y};
+    }
 
     inline float dot(vec2 const v1, vec2 const v2) {
         return v1.x * v2.x + v1.y * v2.y;
