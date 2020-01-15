@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include <chrono>
 #include <iostream>
 
 namespace titan {
@@ -84,28 +85,32 @@ namespace titan {
         return 1.4142135f * noise;
     }
 
+    // size is a power of 2.
     static void generate_noise(unsigned char* const buffer, u32 const size, u32 const octaves, std::mt19937& random_engine) {
         f32 amplitude = 1.0f;
         f32 const persistence = 0.5f;
         f32 const size_f32 = size;
         u64 const size_4aligned = size & (~0x3);
-
         Gradient_Grid const grid = generate_gradients(1 << (octaves - 1), random_engine);
 
+        using namespace std::chrono;
+
         for (u32 octave = 0; octave < octaves; ++octave) {
+            milliseconds start_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
             amplitude *= persistence;
             u64 const noise_scale = 1 << octave;
             f32 const noise_scale_f32 = noise_scale;
             f32 const increment = 1.0f / size_f32 * noise_scale_f32;
-            u64 const octave_change = size_4aligned / noise_scale;
+            // least multiple of noise_scale greater than size
+            u64 const resample_period = ((size + noise_scale - 1) & ~(noise_scale - 1)) / noise_scale;
+            std::cout << resample_period << '\n';
+            if (resample_period >= 4) {
+                for (u64 y = 0; y < size; ++y) {
+                    u64 const y_coord = y * noise_scale / size;
+                    u64 const y_coord_next = (y + 1) * noise_scale / size;
+                    f32 const y_coord_f32 = (f32)y / size_f32 * noise_scale_f32;
 
-            for (u64 y = 0; y < size; ++y) {
-                u64 const y_coord = y * noise_scale / size;
-                u64 const y_coord_next = (y + 1) * noise_scale / size;
-                f32 const y_coord_f32 = (f32)y / size_f32 * noise_scale_f32;
-
-                for (u64 x = 0; x < size_4aligned;) {
-                    {
+                    for (u64 x = 0; x < size_4aligned;) {
                         f32 const x_perlin_sample = (f32)x / size_f32 * noise_scale_f32;
                         vec2 const g00 = grid.at(x_perlin_sample, y_coord);
                         vec2 const g10 = grid.at(x_perlin_sample + 1 * increment, y_coord);
@@ -117,14 +122,12 @@ namespace titan {
                         vec2 const g21 = grid.at(x_perlin_sample + 2 * increment, y_coord_next);
                         vec2 const g31 = grid.at(x_perlin_sample + 3 * increment, y_coord_next);
                         vec2 const g41 = grid.at(x_perlin_sample + 4 * increment, y_coord_next);
-                        for (u64 i = 0; i < octave_change && x < size_4aligned; ++i, x += 4) {
+                        for (u64 i = 0; i < resample_period && x < size_4aligned; i += 4, x += 4) {
                             f32 const xf32 = (f32)x / size_f32 * noise_scale_f32;
-                            // std::cout << xf32 << ' ' << y_coord_f32 << '\n';
                             f32 const val0 = perlin_noise(xf32, y_coord_f32, g00, g10, g01, g11);
                             f32 const val1 = perlin_noise(xf32 + 1 * increment, y_coord_f32, g10, g20, g11, g21);
                             f32 const val2 = perlin_noise(xf32 + 2 * increment, y_coord_f32, g20, g30, g21, g31);
                             f32 const val3 = perlin_noise(xf32 + 3 * increment, y_coord_f32, g30, g40, g31, g41);
-                            // std::cout << "perlin: " << val0 << ' ' << val1 << ' ' << val2 << ' ' << val3 << '\n';
                             buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val0);
                             buffer[y * size + x + 1] += 255.0f * amplitude * (0.5f + 0.5f * val1);
                             buffer[y * size + x + 2] += 255.0f * amplitude * (0.5f + 0.5f * val2);
@@ -132,7 +135,23 @@ namespace titan {
                         }
                     }
 
-                    if (x < size_4aligned) {
+                    for (u64 x = size_4aligned; x < size; ++x) {
+                        f32 const xf32 = (f32)x / size_f32 * noise_scale_f32;
+                        vec2 const g00 = grid.at(xf32, y_coord);
+                        vec2 const g10 = grid.at(xf32 + increment, y_coord);
+                        vec2 const g01 = grid.at(xf32, y_coord_next);
+                        vec2 const g11 = grid.at(xf32 + increment, y_coord_next);
+                        f32 const val = perlin_noise(xf32, y_coord_f32, g00, g10, g01, g11);
+                        buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val);
+                    }
+                }
+            } else {
+                for (u64 y = 0; y < size; ++y) {
+                    u64 const y_coord = y * noise_scale / size;
+                    u64 const y_coord_next = (y + 1) * noise_scale / size;
+                    f32 const y_coord_f32 = (f32)y / size_f32 * noise_scale_f32;
+
+                    for (u64 x = 0; x < size_4aligned; x += 4) {
                         f32 const xf32 = (f32)x / size_f32 * noise_scale_f32;
                         vec2 const g00 = grid.at(xf32, y_coord);
                         vec2 const g10 = grid.at(xf32 + 1 * increment, y_coord);
@@ -144,29 +163,29 @@ namespace titan {
                         vec2 const g21 = grid.at(xf32 + 2 * increment, y_coord_next);
                         vec2 const g31 = grid.at(xf32 + 3 * increment, y_coord_next);
                         vec2 const g41 = grid.at(xf32 + 4 * increment, y_coord_next);
-                        // std::cout << xf32 << ' ' << y_coord_f32 << '\n';
                         f32 const val0 = perlin_noise(xf32, y_coord_f32, g00, g10, g01, g11);
                         f32 const val1 = perlin_noise(xf32 + 1 * increment, y_coord_f32, g10, g20, g11, g21);
                         f32 const val2 = perlin_noise(xf32 + 2 * increment, y_coord_f32, g20, g30, g21, g31);
                         f32 const val3 = perlin_noise(xf32 + 3 * increment, y_coord_f32, g30, g40, g31, g41);
-                        // std::cout << "perlin: " << val0 << ' ' << val1 << ' ' << val2 << ' ' << val3 << '\n';
                         buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val0);
                         buffer[y * size + x + 1] += 255.0f * amplitude * (0.5f + 0.5f * val1);
                         buffer[y * size + x + 2] += 255.0f * amplitude * (0.5f + 0.5f * val2);
                         buffer[y * size + x + 3] += 255.0f * amplitude * (0.5f + 0.5f * val3);
                     }
-                }
 
-                for (u64 x = size_4aligned; x < size; ++x) {
-                    f32 const xf32 = (f32)x / size_f32 * noise_scale_f32;
-                    vec2 const g00 = grid.at(xf32, y_coord);
-                    vec2 const g10 = grid.at(xf32 + increment, y_coord);
-                    vec2 const g01 = grid.at(xf32, y_coord_next);
-                    vec2 const g11 = grid.at(xf32 + increment, y_coord_next);
-                    f32 const val = perlin_noise(xf32, y_coord_f32, g00, g10, g01, g11);
-                    buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val);
+                    for (u64 x = size_4aligned; x < size; ++x) {
+                        f32 const xf32 = (f32)x / size_f32 * noise_scale_f32;
+                        vec2 const g00 = grid.at(xf32, y_coord);
+                        vec2 const g10 = grid.at(xf32 + increment, y_coord);
+                        vec2 const g01 = grid.at(xf32, y_coord_next);
+                        vec2 const g11 = grid.at(xf32 + increment, y_coord_next);
+                        f32 const val = perlin_noise(xf32, y_coord_f32, g00, g10, g01, g11);
+                        buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val);
+                    }
                 }
             }
+            std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
+            std::cout << "Octave " << octave << " ran in " << (end_time - start_time).count() << " ms" << std::endl;
         }
     }
 
