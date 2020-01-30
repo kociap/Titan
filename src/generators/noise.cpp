@@ -81,16 +81,24 @@ namespace titan {
         float const x_fractional = x - x0;
         float const y_fractional = y - y0;
 
+        // std::cout << "fractional " << x_fractional << ' ' << y_fractional << '\n';
+
         float const fac00 = dot(g00, {x_fractional, y_fractional});
         float const fac10 = dot(g10, {x_fractional - 1.0f, y_fractional});
         float const fac01 = dot(g01, {x_fractional, y_fractional - 1.0f});
         float const fac11 = dot(g11, {x_fractional - 1.0f, y_fractional - 1.0f});
 
+        // std::cout << "fac " << fac00 << ' ' << fac10 << ' ' << fac01 << ' ' << fac11 << '\n';
+
         float const x_lerp_factor = x_fractional * x_fractional * x_fractional * (x_fractional * (x_fractional * 6 - 15) + 10);
         float const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
 
+        // std::cout << "lerp_factor " << x_lerp_factor << ' ' << y_lerp_factor << '\n';
+
         float const lerped_x0 = lerp(fac00, fac10, x_lerp_factor);
         float const lerped_x1 = lerp(fac01, fac11, x_lerp_factor);
+        // std::cout << "lerped_x " << lerped_x0 << ' ' << lerped_x1 << '\n';
+        // std::cout << "value " << (1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor)) << "\n\n";
         return 1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor);
     }
 
@@ -124,13 +132,13 @@ namespace titan {
                             f32 const x_3 = x_0 + 3 * increment;
 
                             i64 const x_floor = (i64)x_0;
-                            i64 const y_floor = (i64)y;
+                            i64 const y_floor = (i64)y_coord;
 
                             f32 const x_fractional_0 = x_0 - x_floor;
                             f32 const x_fractional_1 = x_1 - x_floor;
                             f32 const x_fractional_2 = x_2 - x_floor;
                             f32 const x_fractional_3 = x_3 - x_floor;
-                            f32 const y_fractional = y - y_floor;
+                            f32 const y_fractional = y_coord - y_floor;
 
                             f32 const fac00_0 = g00.x * x_fractional_0 + g00.y * y_fractional;
                             f32 const fac10_0 = g10.x * (x_fractional_0 - 1.0f) + g10.y * y_fractional;
@@ -176,11 +184,11 @@ namespace titan {
                             f32 const remapped_1 = 0.5f + 0.5f * 1.4142135f * lerped_y_1;
                             f32 const remapped_2 = 0.5f + 0.5f * 1.4142135f * lerped_y_2;
                             f32 const remapped_3 = 0.5f + 0.5f * 1.4142135f * lerped_y_3;
-                            // std::cout << remapped_0 << ' ' << remapped_1 << ' ' << remapped_2 << ' ' << remapped_3 << '\n';
-                            buffer[y * size + x] = 255.0f * amplitude * remapped_0;
-                            buffer[y * size + x + 1] = 255.0f * amplitude * remapped_1;
-                            buffer[y * size + x + 2] = 255.0f * amplitude * remapped_2;
-                            buffer[y * size + x + 3] = 255.0f * amplitude * remapped_3;
+
+                            buffer[y * size + x] += 255.0f * amplitude * remapped_0;
+                            buffer[y * size + x + 1] += 255.0f * amplitude * remapped_1;
+                            buffer[y * size + x + 2] += 255.0f * amplitude * remapped_2;
+                            buffer[y * size + x + 3] += 255.0f * amplitude * remapped_3;
                         }
                     }
                 }
