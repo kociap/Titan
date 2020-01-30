@@ -1,6 +1,7 @@
 #include "generators/noise.hpp"
 
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
 #include <xmmintrin.h>
 
@@ -157,25 +158,25 @@ namespace titan {
                             f32 const x_lerp_factor_3 = x_fractional_3 * x_fractional_3 * x_fractional_3 * (x_fractional_3 * (x_fractional_3 * 6 - 15) + 10);
                             f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
 
-                            f32 const lerped_x0_0 = (1 - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
-                            f32 const lerped_x1_0 = (1 - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
-                            f32 const lerped_x0_1 = (1 - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
-                            f32 const lerped_x1_1 = (1 - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
-                            f32 const lerped_x0_2 = (1 - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
-                            f32 const lerped_x1_2 = (1 - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
-                            f32 const lerped_x0_3 = (1 - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
-                            f32 const lerped_x1_3 = (1 - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
+                            f32 const lerped_x0_0 = (1.0f - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
+                            f32 const lerped_x1_0 = (1.0f - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
+                            f32 const lerped_x0_1 = (1.0f - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
+                            f32 const lerped_x1_1 = (1.0f - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
+                            f32 const lerped_x0_2 = (1.0f - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
+                            f32 const lerped_x1_2 = (1.0f - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
+                            f32 const lerped_x0_3 = (1.0f - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
+                            f32 const lerped_x1_3 = (1.0f - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
 
-                            f32 const lerped_y_0 = (1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
-                            f32 const lerped_y_1 = (1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
-                            f32 const lerped_y_2 = (1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
-                            f32 const lerped_y_3 = (1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
+                            f32 const lerped_y_0 = (1.0f - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
+                            f32 const lerped_y_1 = (1.0f - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
+                            f32 const lerped_y_2 = (1.0f - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
+                            f32 const lerped_y_3 = (1.0f - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
 
                             f32 const remapped_0 = 0.5f + 0.5f * 1.4142135f * lerped_y_0;
                             f32 const remapped_1 = 0.5f + 0.5f * 1.4142135f * lerped_y_1;
                             f32 const remapped_2 = 0.5f + 0.5f * 1.4142135f * lerped_y_2;
                             f32 const remapped_3 = 0.5f + 0.5f * 1.4142135f * lerped_y_3;
-
+                            // std::cout << remapped_0 << ' ' << remapped_1 << ' ' << remapped_2 << ' ' << remapped_3 << '\n';
                             buffer[y * size + x] = 255.0f * amplitude * remapped_0;
                             buffer[y * size + x + 1] = 255.0f * amplitude * remapped_1;
                             buffer[y * size + x + 2] = 255.0f * amplitude * remapped_2;
