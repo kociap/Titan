@@ -1,8 +1,8 @@
 #include "generators/noise.hpp"
 
 #include <cmath>
-
 #include <stdexcept>
+#include <xmmintrin.h>
 
 namespace titan {
 
@@ -117,15 +117,59 @@ namespace titan {
                         vec2 const g01 = grid.at(sample_offset_x, sample_offset_y + 1);
                         vec2 const g11 = grid.at(sample_offset_x + 1, sample_offset_y + 1);
                         for (u64 i = 0; i < resample_period; i += 4, x += 4) {
-                            f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
-                            f32 const val0 = perlin_noise(x_coord, y_coord, g00, g10, g01, g11);
-                            f32 const val1 = perlin_noise(x_coord + 1 * increment, y_coord, g00, g10, g01, g11);
-                            f32 const val2 = perlin_noise(x_coord + 2 * increment, y_coord, g00, g10, g01, g11);
-                            f32 const val3 = perlin_noise(x_coord + 3 * increment, y_coord, g00, g10, g01, g11);
-                            buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val0);
-                            buffer[y * size + x + 1] += 255.0f * amplitude * (0.5f + 0.5f * val1);
-                            buffer[y * size + x + 2] += 255.0f * amplitude * (0.5f + 0.5f * val2);
-                            buffer[y * size + x + 3] += 255.0f * amplitude * (0.5f + 0.5f * val3);
+                            f32 const x_0 = (f32)x / size_f32 * noise_scale_f32;
+                            f32 const x_1 = x_0 + 1 * increment;
+                            f32 const x_2 = x_0 + 2 * increment;
+                            f32 const x_3 = x_0 + 3 * increment;
+
+                            i64 const x_floor = (i64)x_0;
+                            i64 const y_floor = (i64)y;
+
+                            f32 const x_fractional_0 = x_0 - x_floor;
+                            f32 const x_fractional_1 = x_1 - x_floor;
+                            f32 const x_fractional_2 = x_2 - x_floor;
+                            f32 const x_fractional_3 = x_3 - x_floor;
+                            f32 const y_fractional = y - y_floor;
+
+                            f32 const fac00_0 = g00.x * x_fractional_0 + g00.y * y_fractional;
+                            f32 const fac10_0 = g10.x * (x_fractional_0 - 1.0f) + g10.y * y_fractional;
+                            f32 const fac01_0 = g01.x * x_fractional_0 + g01.y * (y_fractional - 1.0f);
+                            f32 const fac11_0 = g11.x * (x_fractional_0 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            f32 const fac00_1 = g00.x * x_fractional_1 + g00.y * y_fractional;
+                            f32 const fac10_1 = g10.x * (x_fractional_1 - 1.0f) + g10.y * y_fractional;
+                            f32 const fac01_1 = g01.x * x_fractional_1 + g01.y * (y_fractional - 1.0f);
+                            f32 const fac11_1 = g11.x * (x_fractional_1 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            f32 const fac00_2 = g00.x * x_fractional_2 + g00.y * y_fractional;
+                            f32 const fac10_2 = g10.x * (x_fractional_2 - 1.0f) + g10.y * y_fractional;
+                            f32 const fac01_2 = g01.x * x_fractional_2 + g01.y * (y_fractional - 1.0f);
+                            f32 const fac11_2 = g11.x * (x_fractional_2 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            f32 const fac00_3 = g00.x * x_fractional_3 + g00.y * y_fractional;
+                            f32 const fac10_3 = g10.x * (x_fractional_3 - 1.0f) + g10.y * y_fractional;
+                            f32 const fac01_3 = g01.x * x_fractional_3 + g01.y * (y_fractional - 1.0f);
+                            f32 const fac11_3 = g11.x * (x_fractional_3 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            f32 const x_lerp_factor_0 = x_fractional_0 * x_fractional_0 * x_fractional_0 * (x_fractional_0 * (x_fractional_0 * 6 - 15) + 10);
+                            f32 const x_lerp_factor_1 = x_fractional_1 * x_fractional_1 * x_fractional_1 * (x_fractional_1 * (x_fractional_1 * 6 - 15) + 10);
+                            f32 const x_lerp_factor_2 = x_fractional_2 * x_fractional_2 * x_fractional_2 * (x_fractional_2 * (x_fractional_2 * 6 - 15) + 10);
+                            f32 const x_lerp_factor_3 = x_fractional_3 * x_fractional_3 * x_fractional_3 * (x_fractional_3 * (x_fractional_3 * 6 - 15) + 10);
+                            f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+                            f32 const lerped_x0_0 = (1 - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
+                            f32 const lerped_x1_0 = (1 - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
+                            f32 const lerped_x0_1 = (1 - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
+                            f32 const lerped_x1_1 = (1 - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
+                            f32 const lerped_x0_2 = (1 - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
+                            f32 const lerped_x1_2 = (1 - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
+                            f32 const lerped_x0_3 = (1 - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
+                            f32 const lerped_x1_3 = (1 - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
+
+                            buffer[y * size + x] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0));
+                            buffer[y * size + x + 1] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1));
+                            buffer[y * size + x + 2] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2));
+                            buffer[y * size + x + 3] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3));
                         }
                     }
                 }
