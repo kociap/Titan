@@ -166,10 +166,20 @@ namespace titan {
                             f32 const lerped_x0_3 = (1 - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
                             f32 const lerped_x1_3 = (1 - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
 
-                            buffer[y * size + x] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0));
-                            buffer[y * size + x + 1] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1));
-                            buffer[y * size + x + 2] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2));
-                            buffer[y * size + x + 3] = 255.0f * amplitude * (0.5f + 0.5f * 1.4142135f * ((1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3));
+                            f32 const lerped_y_0 = (1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
+                            f32 const lerped_y_1 = (1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
+                            f32 const lerped_y_2 = (1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
+                            f32 const lerped_y_3 = (1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
+
+                            f32 const remapped_0 = 0.5f + 0.5f * 1.4142135f * lerped_y_0;
+                            f32 const remapped_1 = 0.5f + 0.5f * 1.4142135f * lerped_y_1;
+                            f32 const remapped_2 = 0.5f + 0.5f * 1.4142135f * lerped_y_2;
+                            f32 const remapped_3 = 0.5f + 0.5f * 1.4142135f * lerped_y_3;
+
+                            buffer[y * size + x] = 255.0f * amplitude * remapped_0;
+                            buffer[y * size + x + 1] = 255.0f * amplitude * remapped_1;
+                            buffer[y * size + x + 2] = 255.0f * amplitude * remapped_2;
+                            buffer[y * size + x + 3] = 255.0f * amplitude * remapped_3;
                         }
                     }
                 }
