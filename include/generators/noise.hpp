@@ -1,11 +1,6 @@
 #ifndef TITAN_TERRAINS_NOISE_HPP_
 #define TITAN_TERRAINS_NOISE_HPP_
 
-#include "math.hpp"
-
-#include <random>
-#include <vector>
-
 namespace titan {
     using u8 = unsigned char;
     using i32 = int;
@@ -16,6 +11,7 @@ namespace titan {
 
     // size must be a power of 2
     void generate_perlin_noise_texture(float* buffer, u64 seed, u32 size, u32 octaves = 1);
+    void generate_perlin_noise_texture_inverted_loop(float* buffer, u64 seed, u32 size, u32 octaves = 1);
 } // namespace titan
 
 #endif

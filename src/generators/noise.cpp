@@ -1,8 +1,11 @@
 #include "generators/noise.hpp"
 
+#include "math.hpp"
+
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 
 #include <smmintrin.h>
@@ -50,6 +53,29 @@ namespace titan {
         float const lerped_x0 = lerp(fac00, fac10, x_lerp_factor);
         float const lerped_x1 = lerp(fac01, fac11, x_lerp_factor);
         return 1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor);
+    }
+
+    template <class Tp>
+    inline void DoNotOptimize(Tp const& value) {
+        asm volatile(""
+                     :
+                     : "r,m"(value)
+                     : "memory");
+    }
+
+    template <class Tp>
+    inline void DoNotOptimize(Tp& value) {
+#if defined(__clang__)
+        asm volatile(""
+                     : "+r,m"(value)
+                     :
+                     : "memory");
+#else
+        asm volatile(""
+                     : "+m,r"(value)
+                     :
+                     : "memory");
+#endif
     }
 
     void generate_perlin_noise_texture(float* const buffer, u64 const seed, u32 const size, u32 const octaves) {
@@ -121,16 +147,17 @@ namespace titan {
                             __m128 noise_r0 = _mm_add_ps(lerpy_c0_xmm, lerpy_c1_xmm);
                             __m128 noise_r1 = _mm_add_ps(noise_r0, _mm_set1_ps(0.7071067f));
                             __m128 noise_r2 = _mm_mul_ps(noise_r1, _mm_set1_ps(amplitude * 0.5f * 1.4142135f));
-                            __m128 current = _mm_loadu_ps(buffer + y * size + x);
+                            __m128 current = _mm_load_ps(buffer + y * size + x);
                             __m128 noise = _mm_add_ps(noise_r2, current);
-                            _mm_storeu_ps(buffer + y * size + x, noise);
+                            // DoNotOptimize(noise_r2);
+                            _mm_store_ps(buffer + y * size + x, noise);
                         }
                     }
                 }
             } else {
                 for (u64 y = 0; y < size; ++y) {
                     f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
-                    u64 const sample_offset_y = (u64)y_coord % size;
+                    u64 const sample_offset_y = (u64)y_coord;
                     for (u64 x = 0; x < size; ++x) {
                         f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
                         u64 const sample_offset_x = x_coord;
@@ -142,6 +169,63 @@ namespace titan {
                         buffer[y * size + x] += amplitude * (0.5f + 0.5f * val);
                     }
                 }
+            }
+        }
+    }
+
+    static f32 quick_pow(f32 base, u32 exponent) {
+        f32 result = 1.0f;
+        for (u32 i = 0; i < exponent; ++i) {
+            result *= base;
+        }
+        return result;
+    }
+
+    void generate_perlin_noise_texture_inverted_loop(float* const buffer, u64 const seed, u32 const size, u32 const octaves) {
+        std::mt19937 random_engine(seed);
+        Gradient_Grid const grid = create_gradient_grid(1 << (octaves - 1), random_engine);
+
+        f32 const persistence = 0.5f;
+        f32 const size_f32 = size;
+
+        for (u64 y = 0; y < size; ++y) {
+            for (u64 x = 0; x < size; ++x) {
+                f32 val = 0.0f;
+                for (u32 octave = 0; octave < octaves; ++octave) {
+                    f32 const amplitude = quick_pow(0.5f, octave + 1);
+                    u64 const noise_scale = 1 << octave;
+                    f32 const noise_scale_f32 = noise_scale;
+                    u64 const resample_period = size / noise_scale;
+
+                    f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
+                    f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
+                    u64 const sample_x = x_coord;
+                    u64 const sample_y = y_coord;
+                    vec2 const g00 = grid.at(sample_x, sample_y);
+                    vec2 const g10 = grid.at(sample_x + 1, sample_y);
+                    vec2 const g01 = grid.at(sample_x, sample_y + 1);
+                    vec2 const g11 = grid.at(sample_x + 1, sample_y + 1);
+                    val += amplitude * (0.5f + 0.5f * perlin_noise(x_coord, y_coord, g00, g10, g01, g11));
+
+                    // i64 const x0 = (i64)x;
+                    // i64 const y0 = (i64)y;
+
+                    // float const x_fractional = x - x0;
+                    // float const y_fractional = y - y0;
+
+                    // float const fac00 = dot(g00, {x_fractional, y_fractional});
+                    // float const fac10 = dot(g10, {x_fractional - 1.0f, y_fractional});
+                    // float const fac01 = dot(g01, {x_fractional, y_fractional - 1.0f});
+                    // float const fac11 = dot(g11, {x_fractional - 1.0f, y_fractional - 1.0f});
+
+                    // float const x_lerp_factor = x_fractional * x_fractional * x_fractional * (x_fractional * (x_fractional * 6 - 15) + 10);
+                    // float const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+                    // float const lerped_x0 = lerp(fac00, fac10, x_lerp_factor);
+                    // float const lerped_x1 = lerp(fac01, fac11, x_lerp_factor);
+                    // return 1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor);
+                }
+                buffer[y * size + x] = val;
             }
         }
     }
