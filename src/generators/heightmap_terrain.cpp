@@ -13,7 +13,7 @@ namespace titan {
 
     static float sample_height(HeightmapTerrain const& terrain, float x, float y) {
         size_t const index = index_2d(x * (terrain.heightmap_width - 1), y * (terrain.heightmap_height - 1), terrain.heightmap_width);
-        return terrain.height_map[index] / 255.0f;
+        return terrain.height_map[index];
     }
 
     static void calculate_normals(HeightmapTerrain& terrain) {

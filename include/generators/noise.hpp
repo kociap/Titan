@@ -11,8 +11,8 @@ namespace titan {
       public:
         PerlinNoise(size_t seed);
 
-        std::vector<unsigned char> get_buffer(size_t size, size_t octaves = 1);
-        void get_buffer(unsigned char* buffer, size_t size, size_t octaves = 1);
+        std::vector<float> get_buffer(size_t size, size_t octaves = 1);
+        void get_buffer(float* buffer, size_t size, size_t octaves = 1);
 
         float value(float x, float y) const;
 

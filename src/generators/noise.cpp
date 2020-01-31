@@ -30,8 +30,8 @@ namespace titan {
 
     PerlinNoise::PerlinNoise(size_t seed) : seed(seed), random_engine(seed) {}
 
-    std::vector<unsigned char> PerlinNoise::get_buffer(size_t size, size_t octaves) {
-        std::vector<unsigned char> buffer(size * size, 0);
+    std::vector<float> PerlinNoise::get_buffer(size_t size, size_t octaves) {
+        std::vector<float> buffer(size * size, 0);
         get_buffer(buffer.data(), size, octaves);
         return buffer;
     }
@@ -45,27 +45,23 @@ namespace titan {
 
     struct Gradient_Grid {
         vec2 gradients[24];
-        u8 gradients_size;
         u8 perm_table[128];
-        u8 perm_table_size;
 
         vec2 at(u64 const x, u64 const y) const {
-            u8 const index = (y % perm_table_size + x) % perm_table_size;
-            return gradients[perm_table[index] % gradients_size];
+            u8 const index = (y % 128 + x) % 128;
+            return gradients[perm_table[index] % 24];
         }
     };
 
     static Gradient_Grid create_gradient_grid(u64 const size, std::mt19937& random_engine) {
         Gradient_Grid grid;
-        grid.gradients_size = 24;
-        grid.perm_table_size = 128;
 
-        for (int i = 0; i < grid.gradients_size; ++i) {
+        for (int i = 0; i < 24; ++i) {
             grid.gradients[i] = random_unit_vec2(random_engine);
         }
 
         std::uniform_int_distribution<u32> d(0, 255);
-        for (int i = 0; i < grid.perm_table_size; ++i) {
+        for (int i = 0; i < 128; ++i) {
             grid.perm_table[i] = d(random_engine);
         }
 
@@ -103,7 +99,7 @@ namespace titan {
     }
 
     // size is a power of 2.
-    static void generate_noise(unsigned char* const buffer, u32 const size, u32 const octaves, std::mt19937& random_engine) {
+    static void generate_noise(f32* const buffer, u32 const size, u32 const octaves, std::mt19937& random_engine) {
         f32 amplitude = 1.0f;
         f32 const persistence = 0.5f;
         f32 const size_f32 = size;
@@ -140,6 +136,12 @@ namespace titan {
                             f32 const x_fractional_3 = x_3 - x_floor;
                             f32 const y_fractional = y_coord - y_floor;
 
+                            // __m128 x_floor_xmm = _mm_set1_ps(x_floor);
+                            // __m128 x_base_xmm = _mm_set_ps(x_3, x_2, x_1, x_0);
+                            // __m128 fractional_xmm = _mm_sub_ps(x_base_xmm, x_floor_xmm);
+                            // __m128 negative_one_xmm = _mm_set1_ps(-1.0f);
+                            // __m128 fractional_less_one_xmm = _mm_add_ps(fractional_xmm, negative_one_xmm);
+
                             f32 const fac00_0 = g00.x * x_fractional_0 + g00.y * y_fractional;
                             f32 const fac10_0 = g10.x * (x_fractional_0 - 1.0f) + g10.y * y_fractional;
                             f32 const fac01_0 = g01.x * x_fractional_0 + g01.y * (y_fractional - 1.0f);
@@ -166,29 +168,56 @@ namespace titan {
                             f32 const x_lerp_factor_3 = x_fractional_3 * x_fractional_3 * x_fractional_3 * (x_fractional_3 * (x_fractional_3 * 6 - 15) + 10);
                             f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
 
-                            f32 const lerped_x0_0 = (1.0f - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
-                            f32 const lerped_x1_0 = (1.0f - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
-                            f32 const lerped_x0_1 = (1.0f - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
-                            f32 const lerped_x1_1 = (1.0f - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
-                            f32 const lerped_x0_2 = (1.0f - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
-                            f32 const lerped_x1_2 = (1.0f - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
-                            f32 const lerped_x0_3 = (1.0f - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
-                            f32 const lerped_x1_3 = (1.0f - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
+                            __m128 one_xmm = _mm_set1_ps(1.0f);
+                            __m128 lerp_factor_xmm = _mm_set_ps(x_lerp_factor_3, x_lerp_factor_2, x_lerp_factor_1, x_lerp_factor_0);
+                            __m128 lerp_factor_compl_xmm = _mm_sub_ps(one_xmm, lerp_factor_xmm);
+                            __m128 fac00_xmm = _mm_set_ps(fac00_3, fac00_2, fac00_1, fac00_0);
+                            __m128 lerpx0_c1_xmm = _mm_mul_ps(lerp_factor_compl_xmm, fac00_xmm);
+                            __m128 fac01_xmm = _mm_set_ps(fac01_3, fac01_2, fac01_1, fac01_0);
+                            __m128 lerpx1_c1_xmm = _mm_mul_ps(lerp_factor_compl_xmm, fac01_xmm);
+                            __m128 fac10_xmm = _mm_set_ps(fac10_3, fac10_2, fac10_1, fac10_0);
+                            __m128 lerpx0_c0_xmm = _mm_mul_ps(lerp_factor_xmm, fac10_xmm);
+                            __m128 fac11_xmm = _mm_set_ps(fac11_3, fac11_2, fac11_1, fac11_0);
+                            __m128 lerpx1_c0_xmm = _mm_mul_ps(lerp_factor_xmm, fac11_xmm);
+                            __m128 lerpx0_xmm = _mm_add_ps(lerpx0_c0_xmm, lerpx0_c1_xmm);
+                            __m128 lerpx1_xmm = _mm_add_ps(lerpx1_c0_xmm, lerpx1_c1_xmm);
 
-                            f32 const lerped_y_0 = (1.0f - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
-                            f32 const lerped_y_1 = (1.0f - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
-                            f32 const lerped_y_2 = (1.0f - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
-                            f32 const lerped_y_3 = (1.0f - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
+                            __m128 lerp_factor_y_xmm = _mm_set1_ps(y_lerp_factor);
+                            __m128 lerpy_c0_xmm = _mm_mul_ps(lerpx1_xmm, lerp_factor_y_xmm);
+                            __m128 lerp_factor_y_compl_xmm = _mm_set1_ps(1.0f - y_lerp_factor);
+                            __m128 lerpy_c1_xmm = _mm_mul_ps(lerpx0_xmm, lerp_factor_y_compl_xmm);
+                            __m128 noise_r0 = _mm_add_ps(lerpy_c0_xmm, lerpy_c1_xmm);
+                            __m128 r1 = _mm_set1_ps(0.7071067f);
+                            __m128 noise_r1 = _mm_add_ps(noise_r0, r1);
+                            __m128 r2 = _mm_set1_ps(amplitude * 0.5f * 1.4142135f);
+                            __m128 noise_r2 = _mm_mul_ps(noise_r1, r2);
+                            __m128 current = _mm_loadu_ps(buffer + y * size + x);
+                            __m128 val = _mm_add_ps(noise_r2, current);
+                            _mm_storeu_ps(buffer + y * size + x, val);
 
-                            f32 const remapped_0 = 0.5f + 0.5f * 1.4142135f * lerped_y_0;
-                            f32 const remapped_1 = 0.5f + 0.5f * 1.4142135f * lerped_y_1;
-                            f32 const remapped_2 = 0.5f + 0.5f * 1.4142135f * lerped_y_2;
-                            f32 const remapped_3 = 0.5f + 0.5f * 1.4142135f * lerped_y_3;
+                            // f32 const lerped_x0_0 = (1.0f - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
+                            // f32 const lerped_x1_0 = (1.0f - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
+                            // f32 const lerped_x0_1 = (1.0f - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
+                            // f32 const lerped_x1_1 = (1.0f - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
+                            // f32 const lerped_x0_2 = (1.0f - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
+                            // f32 const lerped_x1_2 = (1.0f - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
+                            // f32 const lerped_x0_3 = (1.0f - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
+                            // f32 const lerped_x1_3 = (1.0f - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
 
-                            buffer[y * size + x] += 255.0f * amplitude * remapped_0;
-                            buffer[y * size + x + 1] += 255.0f * amplitude * remapped_1;
-                            buffer[y * size + x + 2] += 255.0f * amplitude * remapped_2;
-                            buffer[y * size + x + 3] += 255.0f * amplitude * remapped_3;
+                            // f32 const lerped_y_0 = (1.0f - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
+                            // f32 const lerped_y_1 = (1.0f - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
+                            // f32 const lerped_y_2 = (1.0f - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
+                            // f32 const lerped_y_3 = (1.0f - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
+
+                            // f32 const remapped_0 = 0.5f + 0.5f * 1.4142135f * lerped_y_0;
+                            // f32 const remapped_1 = 0.5f + 0.5f * 1.4142135f * lerped_y_1;
+                            // f32 const remapped_2 = 0.5f + 0.5f * 1.4142135f * lerped_y_2;
+                            // f32 const remapped_3 = 0.5f + 0.5f * 1.4142135f * lerped_y_3;
+
+                            // buffer[y * size + x] += amplitude * remapped_0;
+                            // buffer[y * size + x + 1] += amplitude * remapped_1;
+                            // buffer[y * size + x + 2] += amplitude * remapped_2;
+                            // buffer[y * size + x + 3] += amplitude * remapped_3;
                         }
                     }
                 }
@@ -204,7 +233,7 @@ namespace titan {
                         vec2 const g01 = grid.at(sample_offset_x, sample_offset_y + 1);
                         vec2 const g11 = grid.at(sample_offset_x + 1, sample_offset_y + 1);
                         f32 const val = perlin_noise(x_coord, y_coord, g00, g10, g01, g11);
-                        buffer[y * size + x] += 255.0f * amplitude * (0.5f + 0.5f * val);
+                        buffer[y * size + x] += amplitude * (0.5f + 0.5f * val);
                     }
                 }
             }
@@ -212,7 +241,7 @@ namespace titan {
         destroy_gradient_grid(grid);
     }
 
-    void PerlinNoise::get_buffer(unsigned char* buffer, size_t size, size_t octaves) {
+    void PerlinNoise::get_buffer(float* buffer, size_t size, size_t octaves) {
         generate_noise(buffer, size, octaves, random_engine);
     }
 
