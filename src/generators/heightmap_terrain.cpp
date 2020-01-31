@@ -3,6 +3,9 @@
 
 #include "math.hpp"
 
+#include <chrono>
+#include <iostream>
+
 namespace titan {
 
     using namespace math;
@@ -72,9 +75,10 @@ namespace titan {
 
         // Generate mesh
         terrain.mesh = create_grid_mesh(info.width, info.length, info.resolution, info.texture_mode);
-        // Create noise buffer
-        PerlinNoise noise(info.noise_seed);
-        terrain.height_map = noise.get_buffer(info.noise_size, info.noise_layers);
+
+        std::vector<float> buffer(info.noise_size * info.noise_size, 0);
+        generate_perlin_noise_texture(buffer.data(), info.noise_seed, info.noise_size, info.noise_layers);
+        terrain.height_map = std::move(buffer);
 
         // TODO: Make this optional (maybe not) + make it work with other texture modes (see sample_height)
         calculate_normals(terrain);

@@ -9,42 +9,7 @@
 #include <xmmintrin.h>
 
 namespace titan {
-
     using namespace math;
-
-    PerlinNoise::gradient_grid::gradient_grid(size_t w, size_t h, std::mt19937& engine) {
-        ++w;
-        ++h;
-        size.x = w;
-        size.y = h;
-        gradients.resize(w * h);
-        for (int i = 0; i < w * h; ++i) {
-            gradients[i] = random_unit_vec2(engine);
-        }
-    }
-
-    vec2& PerlinNoise::gradient_grid::at(size_t x, size_t y) {
-        return gradients[y * (size_t)size.x + x];
-    }
-
-    vec2 const& PerlinNoise::gradient_grid::at(size_t x, size_t y) const {
-        return gradients[y * (size_t)size.x + x];
-    }
-
-    PerlinNoise::PerlinNoise(size_t seed) : seed(seed), random_engine(seed) {}
-
-    std::vector<float> PerlinNoise::get_buffer(size_t size, size_t octaves) {
-        std::vector<float> buffer(size * size, 0);
-        get_buffer(buffer.data(), size, octaves);
-        return buffer;
-    }
-
-    using u8 = unsigned char;
-    using i32 = int;
-    using u32 = unsigned int;
-    using i64 = long long;
-    using u64 = unsigned long long;
-    using f32 = float;
 
     struct Gradient_Grid {
         vec2 gradients[16];
@@ -87,13 +52,13 @@ namespace titan {
         return 1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor);
     }
 
-    // size is a power of 2.
-    static void generate_noise(f32* const buffer, u32 const size, u32 const octaves, std::mt19937& random_engine) {
+    void generate_perlin_noise_texture(float* const buffer, u64 const seed, u32 const size, u32 const octaves) {
+        std::mt19937 random_engine(seed);
+        Gradient_Grid const grid = create_gradient_grid(1 << (octaves - 1), random_engine);
+
         f32 amplitude = 1.0f;
         f32 const persistence = 0.5f;
         f32 const size_f32 = size;
-        Gradient_Grid const grid = create_gradient_grid(1 << (octaves - 1), random_engine);
-
         for (u32 octave = 0; octave < octaves; ++octave) {
             amplitude *= persistence;
             u64 const noise_scale = 1 << octave;
@@ -180,59 +145,4 @@ namespace titan {
             }
         }
     }
-
-    void PerlinNoise::get_buffer(float* buffer, size_t size, size_t octaves) {
-        generate_noise(buffer, size, octaves, random_engine);
-    }
-
-    static float perlin_lerp(float a0, float a1, float x) {
-        //    float w = 6 * std::pow(x, 5) - 15 * std::pow(x, 4) + 10 * std::pow(x, 3); ==>  SLOW, line below is 10 times faster
-        float w = x * x * x * (x * (x * 6 - 15) + 10);
-        return lerp(a0, a1, w);
-    }
-
-    // x and y are the point's position, ix and iy are the cell coordinates
-    static float dot_grid_gradient(int ix, int iy, float x, float y, PerlinNoise::gradient_grid const& gradients) {
-        // distance vector
-        float dx = x - (float)ix;
-        float dy = y - (float)iy;
-
-        vec2 const gradient = gradients.at(ix, iy);
-        return (dx * gradient.x + dy * gradient.y);
-    }
-
-    float PerlinNoise::value(float x, float y) const {
-        // get grid cell coordinates
-        int x0 = (int)x;
-        int x1 = x0 + 1;
-        int y0 = (int)y;
-        int y1 = y0 + 1;
-
-        // interpolation weights
-        float sx = x - (float)x0;
-        float sy = y - (float)y0;
-
-        // interpolate between grid point gradients
-        float n0, n1, ix0, ix1, value;
-        n0 = dot_grid_gradient(x0, y0, x, y, gradients);
-        n1 = dot_grid_gradient(x1, y0, x, y, gradients);
-        ix0 = perlin_lerp(n0, n1, sx);
-
-        n0 = dot_grid_gradient(x0, y1, x, y, gradients);
-        n1 = dot_grid_gradient(x1, y1, x, y, gradients);
-        ix1 = perlin_lerp(n0, n1, sx);
-
-        value = perlin_lerp(ix0, ix1, sy);
-        return value;
-    }
-
-    void PerlinNoise::regenerate_gradients() {
-        regenerate_gradients(scale);
-    }
-
-    void PerlinNoise::regenerate_gradients(size_t new_scale) {
-        gradients = gradient_grid(new_scale, new_scale, random_engine);
-        scale = new_scale;
-    }
-
 } // namespace titan
