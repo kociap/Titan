@@ -77,14 +77,15 @@ namespace titan {
         terrain.mesh = create_grid_mesh(info.width, info.length, info.resolution, info.texture_mode);
         using namespace std::chrono;
         milliseconds malloc_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
-        char* buffer = (char*)malloc(info.noise_size * info.noise_size * sizeof(float) + 15);
-        float* aligned_buffer = (float*)(((uintptr_t)buffer + 15) & ~0xF);
+        char* buffer = (char*)malloc(info.noise_size * info.noise_size * sizeof(float) + 0xFF);
+        float* aligned_buffer = (float*)(((uintptr_t)buffer + 0xFF) & ~0xFF);
         milliseconds start_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
-        generate_perlin_noise_texture_inverted_loop(aligned_buffer, info.noise_seed, info.noise_size, info.noise_layers);
+        generate_perlin_noise_texture(aligned_buffer, info.noise_seed, info.noise_size, info.noise_layers);
         std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
         std::cout << "Noise generated " << (end_time - start_time).count() << "ms (with malloc " << (end_time - malloc_time).count() << "ms)\n";
         terrain.height_map.resize(info.noise_size * info.noise_size, 0);
         memcpy(terrain.height_map.data(), aligned_buffer, info.noise_size * info.noise_size * sizeof(float));
+        free(buffer);
 
         // TODO: Make this optional (maybe not) + make it work with other texture modes (see sample_height)
         calculate_normals(terrain);
