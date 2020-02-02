@@ -250,60 +250,194 @@ namespace titan {
         }
     }
 
-    static f32 quick_pow(f32 base, u32 exponent) {
-        f32 result = 1.0f;
-        for (u32 i = 0; i < exponent; ++i) {
-            result *= base;
-        }
-        return result;
-    }
-
     // void generate_perlin_noise_texture_inverted_loop(float* const buffer, u64 const seed, u32 const size, u32 const octaves) {
     //     std::mt19937 random_engine(seed);
     //     Gradient_Grid const grid = create_gradient_grid(1 << (octaves - 1), random_engine);
 
     //     f32 const persistence = 0.5f;
-    //     f32 const size_f32 = size;
 
+    //     // TODO: 8+ octaves path
+
+    //     __m256 const size_f32 = _mm256_set1_ps(size);
     //     for (u64 y = 0; y < size; ++y) {
+    //         __m256 const y_f32 = _mm256_set1_ps(y);
     //         for (u64 x = 0; x < size; ++x) {
-    //             f32 val = 0.0f;
-    //             for (u32 octave = 0; octave < octaves; ++octave) {
-    //                 f32 const amplitude = quick_pow(0.5f, octave + 1);
-    //                 u64 const noise_scale = 1 << octave;
-    //                 f32 const noise_scale_f32 = noise_scale;
-    //                 u64 const resample_period = size / noise_scale;
+    //             __m256i noise_scale = _mm256_sllv_epi32(_mm256_set1_epi32(1), _mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0));
+    //             __m256 noise_scale_f32 = _mm256_cvtepi32_ps(noise_scale);
 
-    //                 f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
-    //                 f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
-    //                 u64 const sample_x = x_coord;
-    //                 u64 const sample_y = y_coord;
-    //                 vec2 const g00 = grid.at(sample_x, sample_y);
-    //                 vec2 const g10 = grid.at(sample_x + 1, sample_y);
-    //                 vec2 const g01 = grid.at(sample_x, sample_y + 1);
-    //                 vec2 const g11 = grid.at(sample_x + 1, sample_y + 1);
-    //                 val += amplitude * (0.5f + 0.5f * perlin_noise(x_coord, y_coord, g00, g10, g01, g11));
+    //             __m256 scale_factor = _mm256_div_ps(noise_scale_f32, size_f32);
 
-    //                 // i64 const x0 = (i64)x;
-    //                 // i64 const y0 = (i64)y;
+    //             __m256 x_coord = _mm256_mul_ps(_mm256_set1_ps(x), scale_factor);
+    //             __m256 y_coord = _mm256_mul_ps(y_f32, scale_factor);
 
-    //                 // float const x_fractional = x - x0;
-    //                 // float const y_fractional = y - y0;
+    //             __m256 x_floor = _mm256_floor_ps(x_coord);
+    //             __m256 y_floor = _mm256_floor_ps(y_coord);
 
-    //                 // float const fac00 = dot(g00, {x_fractional, y_fractional});
-    //                 // float const fac10 = dot(g10, {x_fractional - 1.0f, y_fractional});
-    //                 // float const fac01 = dot(g01, {x_fractional, y_fractional - 1.0f});
-    //                 // float const fac11 = dot(g11, {x_fractional - 1.0f, y_fractional - 1.0f});
+    //             alignas(32) f32 sample_x[8];
+    //             _mm256_store_ps(sample_x, x_floor);
+    //             alignas(32) f32 sample_y[8];
+    //             _mm256_store_ps(sample_y, y_floor);
 
-    //                 // float const x_lerp_factor = x_fractional * x_fractional * x_fractional * (x_fractional * (x_fractional * 6 - 15) + 10);
-    //                 // float const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+    //             vec2 const g00[8] = {
+    //                 grid.at(sample_x[0], sample_y[0]),
+    //                 grid.at(sample_x[1], sample_y[1]),
+    //                 grid.at(sample_x[2], sample_y[2]),
+    //                 grid.at(sample_x[3], sample_y[3]),
+    //                 grid.at(sample_x[4], sample_y[4]),
+    //                 grid.at(sample_x[5], sample_y[5]),
+    //                 grid.at(sample_x[6], sample_y[6]),
+    //                 grid.at(sample_x[7], sample_y[7]),
+    //             };
+    //             vec2 const g10[8] = {
+    //                 grid.at(sample_x[0] + 1, sample_y[0]),
+    //                 grid.at(sample_x[1] + 1, sample_y[1]),
+    //                 grid.at(sample_x[2] + 1, sample_y[2]),
+    //                 grid.at(sample_x[3] + 1, sample_y[3]),
+    //                 grid.at(sample_x[4] + 1, sample_y[4]),
+    //                 grid.at(sample_x[5] + 1, sample_y[5]),
+    //                 grid.at(sample_x[6] + 1, sample_y[6]),
+    //                 grid.at(sample_x[7] + 1, sample_y[7]),
+    //             };
+    //             vec2 const g01[8] = {
+    //                 grid.at(sample_x[0], sample_y[0] + 1),
+    //                 grid.at(sample_x[1], sample_y[1] + 1),
+    //                 grid.at(sample_x[2], sample_y[2] + 1),
+    //                 grid.at(sample_x[3], sample_y[3] + 1),
+    //                 grid.at(sample_x[4], sample_y[4] + 1),
+    //                 grid.at(sample_x[5], sample_y[5] + 1),
+    //                 grid.at(sample_x[6], sample_y[6] + 1),
+    //                 grid.at(sample_x[7], sample_y[7] + 1),
+    //             };
+    //             vec2 const g11[8] = {
+    //                 grid.at(sample_x[0] + 1, sample_y[0] + 1),
+    //                 grid.at(sample_x[1] + 1, sample_y[1] + 1),
+    //                 grid.at(sample_x[2] + 1, sample_y[2] + 1),
+    //                 grid.at(sample_x[3] + 1, sample_y[3] + 1),
+    //                 grid.at(sample_x[4] + 1, sample_y[4] + 1),
+    //                 grid.at(sample_x[5] + 1, sample_y[5] + 1),
+    //                 grid.at(sample_x[6] + 1, sample_y[6] + 1),
+    //                 grid.at(sample_x[7] + 1, sample_y[7] + 1),
+    //             };
 
-    //                 // float const lerped_x0 = lerp(fac00, fac10, x_lerp_factor);
-    //                 // float const lerped_x1 = lerp(fac01, fac11, x_lerp_factor);
-    //                 // return 1.4142135f * lerp(lerped_x0, lerped_x1, y_lerp_factor);
+    //             __m256 g00x = _mm256_set_ps(g00[7].x, g00[6].x, g00[5].x, g00[4].x, g00[3].x, g00[2].x, g00[1].x, g00[0].x);
+    //             __m256 g00y = _mm256_set_ps(g00[7].y, g00[6].y, g00[5].y, g00[4].y, g00[3].y, g00[2].y, g00[1].y, g00[0].y);
+    //             __m256 g10x = _mm256_set_ps(g10[7].x, g10[6].x, g10[5].x, g10[4].x, g10[3].x, g10[2].x, g10[1].x, g10[0].x);
+    //             __m256 g10y = _mm256_set_ps(g10[7].y, g10[6].y, g10[5].y, g10[4].y, g10[3].y, g10[2].y, g10[1].y, g10[0].y);
+    //             __m256 g01x = _mm256_set_ps(g01[7].x, g01[6].x, g01[5].x, g01[4].x, g01[3].x, g01[2].x, g01[1].x, g01[0].x);
+    //             __m256 g01y = _mm256_set_ps(g01[7].y, g01[6].y, g01[5].y, g01[4].y, g01[3].y, g01[2].y, g01[1].y, g01[0].y);
+    //             __m256 g11x = _mm256_set_ps(g11[7].x, g11[6].x, g11[5].x, g11[4].x, g11[3].x, g11[2].x, g11[1].x, g11[0].x);
+    //             __m256 g11y = _mm256_set_ps(g11[7].y, g11[6].y, g11[5].y, g11[4].y, g11[3].y, g11[2].y, g11[1].y, g11[0].y);
+
+    //             __m256 x_fractional = _mm256_sub_ps(x_coord, x_floor);
+    //             __m256 y_fractional = _mm256_sub_ps(y_coord, y_floor);
+    //             __m256 x_fractional_s1 = _mm256_sub_ps(x_fractional, _mm256_set1_ps(1.0f));
+    //             __m256 y_fractional_s1 = _mm256_sub_ps(y_fractional, _mm256_set1_ps(1.0f));
+    //             __m256 fac00 = _mm256_add_ps(_mm256_mul_ps(g00x, x_fractional), _mm256_mul_ps(g00y, y_fractional));
+    //             __m256 fac10 = _mm256_add_ps(_mm256_mul_ps(g10x, x_fractional_s1), _mm256_mul_ps(g10y, y_fractional));
+    //             __m256 fac01 = _mm256_add_ps(_mm256_mul_ps(g01x, x_fractional), _mm256_mul_ps(g01y, y_fractional_s1));
+    //             __m256 fac11 = _mm256_add_ps(_mm256_mul_ps(g11x, x_fractional_s1), _mm256_mul_ps(g11y, y_fractional_s1));
+
+    //             __m256 x_fractional_cube = _mm256_mul_ps(x_fractional, _mm256_mul_ps(x_fractional, x_fractional));
+    //             __m256 x_lerp_factor = _mm256_mul_ps(x_fractional_cube, _mm256_add_ps(_mm256_mul_ps(x_fractional, _mm256_sub_ps(_mm256_mul_ps(x_fractional, _mm256_set1_ps(6)), _mm256_set1_ps(15))), _mm256_set1_ps(10)));
+    //             __m256 y_fractional_cube = _mm256_mul_ps(y_fractional, _mm256_mul_ps(y_fractional, y_fractional));
+    //             __m256 y_lerp_factor = _mm256_mul_ps(y_fractional_cube, _mm256_add_ps(_mm256_mul_ps(y_fractional, _mm256_sub_ps(_mm256_mul_ps(y_fractional, _mm256_set1_ps(6)), _mm256_set1_ps(15))), _mm256_set1_ps(10)));
+
+    //             __m256 lerped_x0 = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(_mm256_set1_ps(1.0f), x_lerp_factor), fac00), _mm256_mul_ps(x_lerp_factor, fac10));
+    //             __m256 lerped_x1 = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(_mm256_set1_ps(1.0f), x_lerp_factor), fac01), _mm256_mul_ps(x_lerp_factor, fac11));
+    //             __m256 noise = _mm256_add_ps(_mm256_mul_ps(_mm256_sub_ps(_mm256_set1_ps(1.0f), y_lerp_factor), lerped_x0), _mm256_mul_ps(y_lerp_factor, lerped_x1));
+    //             __m256 noise_remapped = _mm256_mul_ps(_mm256_set1_ps(0.5f * 1.4142135f), _mm256_add_ps(_mm256_set1_ps(0.7071067f), noise));
+    //             __m256 noise_amplitude = _mm256_div_ps(noise_remapped, noise_scale);
+    //             alignas(32) f32 noise_val[8];
+    //             _mm256_store_ps(noise_val, noise_amplitude);
+
+    //             f32 val = 0;
+    //             for (i64 i = 0; i < octaves; ++i) {
+    //                 val += noise_val[i];
     //             }
     //             buffer[y * size + x] = val;
+
+    //             // for (u32 octave = 0; octave < octaves; ++octave) {
+    //             //     f32 const amplitude = quick_pow(0.5f, octave + 1);
+    //             //     u64 const noise_scale = 1 << octave;
+    //             //     f32 const noise_scale_f32 = noise_scale;
+
+    //             //     f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
+    //             //     f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
+    //             //     u64 const sample_x = x_coord;
+    //             //     u64 const sample_y = y_coord;
+    //             //     vec2 const g00 = grid.at(sample_x, sample_y);
+    //             //     vec2 const g10 = grid.at(sample_x + 1, sample_y);
+    //             //     vec2 const g01 = grid.at(sample_x, sample_y + 1);
+    //             //     vec2 const g11 = grid.at(sample_x + 1, sample_y + 1);
+
+    //             //     f32 const x_fractional = x_coord - sample_x;
+    //             //     f32 const y_fractional = y_coord - sample_y;
+
+    //             //     f32 const fac00 = g00.x * x_fractional + g00.y * y_fractional;
+    //             //     f32 const fac10 = g10.x * (x_fractional - 1.0f) + g10.y * y_fractional;
+    //             //     f32 const fac01 = g01.x * x_fractional + g01.y * (y_fractional - 1.0f);
+    //             //     f32 const fac11 = g11.x * (x_fractional - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+    //             //     f32 const x_lerp_factor = x_fractional * x_fractional * x_fractional * (x_fractional * (x_fractional * 6 - 15) + 10);
+    //             //     f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+    //             //     f32 const lerped_x0 = (1 - x_lerp_factor) * fac00 + x_lerp_factor * fac10;
+    //             //     f32 const lerped_x1 = (1 - x_lerp_factor) * fac01 + x_lerp_factor * fac11;
+    //             //     f32 const noise = 1.4142135f * (0.7071067f + (1 - y_lerp_factor) * lerped_x0 + y_lerp_factor * lerped_x1);
+    //             //     val += amplitude * 0.5f * noise;
+    //             // }
     //         }
     //     }
     // }
+
+    // MANUALLY INLINED
+
+    //     i64 const x_floor = (i64)x0;
+    // i64 const y_floor = (i64)y;
+
+    // f32 const x_fractional_0 = x_0 - x_floor;
+    // f32 const x_fractional_1 = x_1 - x_floor;
+    // f32 const x_fractional_2 = x_2 - x_floor;
+    // f32 const x_fractional_3 = x_3 - x_floor;
+    // f32 const y_fractional = y - y_floor;
+
+    // f32 const fac00_0 = g00.x * x_fractional_0 + g00.y * y_fractional;
+    // f32 const fac10_0 = g10.x * (x_fractional_0 - 1.0f) + g10.y * y_fractional;
+    // f32 const fac01_0 = g01.x * x_fractional_0 + g01.y * (y_fractional - 1.0f);
+    // f32 const fac11_0 = g11.x * (x_fractional_0 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+    // f32 const fac00_1 = g00.x * x_fractional_1 + g00.y * y_fractional;
+    // f32 const fac10_1 = g10.x * (x_fractional_1 - 1.0f) + g10.y * y_fractional;
+    // f32 const fac01_1 = g01.x * x_fractional_1 + g01.y * (y_fractional - 1.0f);
+    // f32 const fac11_1 = g11.x * (x_fractional_1 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+    // f32 const fac00_2 = g00.x * x_fractional_2 + g00.y * y_fractional;
+    // f32 const fac10_2 = g10.x * (x_fractional_2 - 1.0f) + g10.y * y_fractional;
+    // f32 const fac01_2 = g01.x * x_fractional_2 + g01.y * (y_fractional - 1.0f);
+    // f32 const fac11_2 = g11.x * (x_fractional_2 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+    // f32 const fac00_3 = g00.x * x_fractional_3 + g00.y * y_fractional;
+    // f32 const fac10_3 = g10.x * (x_fractional_3 - 1.0f) + g10.y * y_fractional;
+    // f32 const fac01_3 = g01.x * x_fractional_3 + g01.y * (y_fractional - 1.0f);
+    // f32 const fac11_3 = g11.x * (x_fractional_3 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+    // f32 const x_lerp_factor_0 = x_fractional_0 * x_fractional_0 * x_fractional_0 * (x_fractional_0 * (x_fractional_0 * 6 - 15) + 10);
+    // f32 const x_lerp_factor_1 = x_fractional_1 * x_fractional_1 * x_fractional_1 * (x_fractional_1 * (x_fractional_1 * 6 - 15) + 10);
+    // f32 const x_lerp_factor_2 = x_fractional_2 * x_fractional_2 * x_fractional_2 * (x_fractional_2 * (x_fractional_2 * 6 - 15) + 10);
+    // f32 const x_lerp_factor_3 = x_fractional_3 * x_fractional_3 * x_fractional_3 * (x_fractional_3 * (x_fractional_3 * 6 - 15) + 10);
+    // f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+    // f32 const lerped_x0_0 = (1 - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
+    // f32 const lerped_x1_0 = (1 - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
+    // f32 const lerped_x0_1 = (1 - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
+    // f32 const lerped_x1_1 = (1 - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
+    // f32 const lerped_x0_2 = (1 - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
+    // f32 const lerped_x1_2 = (1 - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
+    // f32 const lerped_x0_3 = (1 - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
+    // f32 const lerped_x1_3 = (1 - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
+
+    // out_0 = (1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
+    // out_1 = (1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
+    // out_2 = (1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
+    // out_3 = (1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
 } // namespace titan
