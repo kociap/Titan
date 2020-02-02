@@ -79,6 +79,7 @@ namespace titan {
         milliseconds malloc_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
         char* buffer = (char*)malloc(info.noise_size * info.noise_size * sizeof(float) + 0xFF);
         float* aligned_buffer = (float*)(((uintptr_t)buffer + 0xFF) & ~0xFF);
+        memset(buffer, 0, info.noise_size * info.noise_size * sizeof(float) + 0xFF);
         milliseconds start_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
         generate_perlin_noise_texture(aligned_buffer, info.noise_seed, info.noise_size, info.noise_layers);
         std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());

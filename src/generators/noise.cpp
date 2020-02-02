@@ -1,6 +1,7 @@
 #include "generators/noise.hpp"
 
 #include "math.hpp"
+#include <math.h>
 
 #include <chrono>
 #include <cmath>
@@ -23,20 +24,51 @@ namespace titan {
         u8 perm_table[128];
 
         vec2 at(u64 const x, u64 const y) const {
-            u8 const index = (y % 128 + x) % 128;
+            u8 const index = (perm_table[y % 128] + x) % 128;
             return gradients[perm_table[index] % 16];
         }
     };
 
     static Gradient_Grid create_gradient_grid(u64 const size, std::mt19937& random_engine) {
         Gradient_Grid grid{{{0.0f, 1.0f}, {0.382683f, 0.923879f}, {0.707107f, 0.707107f}, {0.923879f, 0.382683f}, {1.0f, 0.0f}, {0.923879f, -0.382683f}, {0.707107f, -0.707107f}, {0.382683f, -0.923879f}, {0.0f, -1.0f}, {-0.382683f, -0.923879f}, {-0.707107f, -0.707107f}, {-0.923879f, -0.382683f}, {-1.0f, 0.0f}, {-0.923879f, 0.382683f}, {-0.707107f, 0.707107f}, {-0.382683f, 0.923879f}}};
+        // Gradient_Grid grid;
 
         std::uniform_int_distribution<u32> d(0, 255);
-        for (int i = 0; i < 128; ++i) {
+        for (i32 i = 0; i < 128; ++i) {
             grid.perm_table[i] = d(random_engine);
         }
 
+        // constexpr f32 pi = 3.1415926535;
+        // std::uniform_real_distribution<f32> g(0, pi);
+        // for (i32 i = 0; i < 24; ++i) {
+        //     f32 angle = g(random_engine);
+        //     grid.gradients[i] = {cos(angle), sin(angle)};
+        // }
+
         return grid;
+    }
+
+    static float perlin_noise(float const x, float const y, vec2 const g00, vec2 const g10, vec2 const g01, vec2 const g11) {
+        int const x0 = (int)x;
+        int const x1 = x0 + 1;
+        int const y0 = (int)y;
+        int const y1 = y0 + 1;
+
+        float const x_fractional = x - x0;
+        float const y_fractional = y - y0;
+
+        float const fac00 = g00.x * x_fractional + g00.y * y_fractional;
+        float const fac10 = g10.x * (x_fractional - 1.0f) + g10.y * y_fractional;
+        float const fac01 = g01.x * x_fractional + g01.y * (y_fractional - 1.0f);
+        float const fac11 = g11.x * (x_fractional - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+        float const x_lerp_factor = x_fractional * x_fractional * x_fractional * (x_fractional * (x_fractional * 6 - 15) + 10);
+        float const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+        float const lerped_x0 = (1 - x_lerp_factor) * fac00 + x_lerp_factor * fac10;
+        float const lerped_x1 = (1 - x_lerp_factor) * fac01 + x_lerp_factor * fac11;
+        float noise = (1 - y_lerp_factor) * lerped_x0 + y_lerp_factor * lerped_x1;
+        return 1.4142135f * noise;
     }
 
     void generate_perlin_noise_texture(float* const buffer, u64 const seed, u32 const size, u32 const octaves) {
@@ -48,10 +80,24 @@ namespace titan {
         f32 const persistence = 0.5f;
         f32 const size_f32 = size;
         for (u32 octave = 0; octave < octaves; ++octave) {
-            milliseconds start_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
+            // milliseconds start_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
             amplitude *= persistence;
             u64 const noise_scale = 1 << octave;
             u64 const resample_period = size / noise_scale;
+
+            // for (u64 y = 0; y < size; ++y) {
+            //     f32 const y_coord = (f32)y / size_f32 * noise_scale_f32;
+            //     for (u64 x = 0; x < size; x += 1) {
+            //         f32 const x_coord = (f32)x / size_f32 * noise_scale_f32;
+            //         vec2 const g00 = grid.at((u64)x_coord, (u64)y_coord);
+            //         vec2 const g10 = grid.at((u64)x_coord + 1, (u64)y_coord);
+            //         vec2 const g01 = grid.at((u64)x_coord, (u64)y_coord + 1);
+            //         vec2 const g11 = grid.at((u64)x_coord + 1, (u64)y_coord + 1);
+            //         f32 const val0 = (0.5f + 0.5f * perlin_noise(x_coord, y_coord, g00, g10, g01, g11));
+            //         buffer[y * size + x] += val0;
+            //     }
+            // }
+
             if (resample_period >= 8) {
                 f32 const scale_factor_f32 = (f32)noise_scale / size_f32;
                 __m256 const scale_factor = _mm256_set1_ps(scale_factor_f32);
@@ -156,6 +202,64 @@ namespace titan {
                             __m128 current = _mm_load_ps(buffer + y * size + x);
                             __m128 noise = _mm_add_ps(noise_r2, current);
                             _mm_store_ps(buffer + y * size + x, noise);
+
+                            // f32 const x_0 = (f32)x / size_f32 * noise_scale_f32;
+                            // f32 const x_1 = (f32)(x + 1) / size_f32 * noise_scale_f32;
+                            // f32 const x_2 = (f32)(x + 2) / size_f32 * noise_scale_f32;
+                            // f32 const x_3 = (f32)(x + 3) / size_f32 * noise_scale_f32;
+
+                            // u64 const x_floor = (u64)x_0;
+                            // u64 const y_floor = (u64)y;
+
+                            // f32 const x_fractional_0 = x_0 - x_floor;
+                            // f32 const x_fractional_1 = x_1 - x_floor;
+                            // f32 const x_fractional_2 = x_2 - x_floor;
+                            // f32 const x_fractional_3 = x_3 - x_floor;
+                            // // f32 const y_fractional = y - y_floor;
+
+                            // f32 const fac00_0 = g00.x * x_fractional_0 + g00.y * y_fractional;
+                            // f32 const fac10_0 = g10.x * (x_fractional_0 - 1.0f) + g10.y * y_fractional;
+                            // f32 const fac01_0 = g01.x * x_fractional_0 + g01.y * (y_fractional - 1.0f);
+                            // f32 const fac11_0 = g11.x * (x_fractional_0 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            // f32 const fac00_1 = g00.x * x_fractional_1 + g00.y * y_fractional;
+                            // f32 const fac10_1 = g10.x * (x_fractional_1 - 1.0f) + g10.y * y_fractional;
+                            // f32 const fac01_1 = g01.x * x_fractional_1 + g01.y * (y_fractional - 1.0f);
+                            // f32 const fac11_1 = g11.x * (x_fractional_1 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            // f32 const fac00_2 = g00.x * x_fractional_2 + g00.y * y_fractional;
+                            // f32 const fac10_2 = g10.x * (x_fractional_2 - 1.0f) + g10.y * y_fractional;
+                            // f32 const fac01_2 = g01.x * x_fractional_2 + g01.y * (y_fractional - 1.0f);
+                            // f32 const fac11_2 = g11.x * (x_fractional_2 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            // f32 const fac00_3 = g00.x * x_fractional_3 + g00.y * y_fractional;
+                            // f32 const fac10_3 = g10.x * (x_fractional_3 - 1.0f) + g10.y * y_fractional;
+                            // f32 const fac01_3 = g01.x * x_fractional_3 + g01.y * (y_fractional - 1.0f);
+                            // f32 const fac11_3 = g11.x * (x_fractional_3 - 1.0f) + g11.y * (y_fractional - 1.0f);
+
+                            // f32 const x_lerp_factor_0 = x_fractional_0 * x_fractional_0 * x_fractional_0 * (x_fractional_0 * (x_fractional_0 * 6 - 15) + 10);
+                            // f32 const x_lerp_factor_1 = x_fractional_1 * x_fractional_1 * x_fractional_1 * (x_fractional_1 * (x_fractional_1 * 6 - 15) + 10);
+                            // f32 const x_lerp_factor_2 = x_fractional_2 * x_fractional_2 * x_fractional_2 * (x_fractional_2 * (x_fractional_2 * 6 - 15) + 10);
+                            // f32 const x_lerp_factor_3 = x_fractional_3 * x_fractional_3 * x_fractional_3 * (x_fractional_3 * (x_fractional_3 * 6 - 15) + 10);
+                            // // f32 const y_lerp_factor = y_fractional * y_fractional * y_fractional * (y_fractional * (y_fractional * 6 - 15) + 10);
+
+                            // f32 const lerped_x0_0 = (1 - x_lerp_factor_0) * fac00_0 + x_lerp_factor_0 * fac10_0;
+                            // f32 const lerped_x1_0 = (1 - x_lerp_factor_0) * fac01_0 + x_lerp_factor_0 * fac11_0;
+                            // f32 const lerped_x0_1 = (1 - x_lerp_factor_1) * fac00_1 + x_lerp_factor_1 * fac10_1;
+                            // f32 const lerped_x1_1 = (1 - x_lerp_factor_1) * fac01_1 + x_lerp_factor_1 * fac11_1;
+                            // f32 const lerped_x0_2 = (1 - x_lerp_factor_2) * fac00_2 + x_lerp_factor_2 * fac10_2;
+                            // f32 const lerped_x1_2 = (1 - x_lerp_factor_2) * fac01_2 + x_lerp_factor_2 * fac11_2;
+                            // f32 const lerped_x0_3 = (1 - x_lerp_factor_3) * fac00_3 + x_lerp_factor_3 * fac10_3;
+                            // f32 const lerped_x1_3 = (1 - x_lerp_factor_3) * fac01_3 + x_lerp_factor_3 * fac11_3;
+
+                            // f32 const out_0 = (1 - y_lerp_factor) * lerped_x0_0 + y_lerp_factor * lerped_x1_0;
+                            // f32 const out_1 = (1 - y_lerp_factor) * lerped_x0_1 + y_lerp_factor * lerped_x1_1;
+                            // f32 const out_2 = (1 - y_lerp_factor) * lerped_x0_2 + y_lerp_factor * lerped_x1_2;
+                            // f32 const out_3 = (1 - y_lerp_factor) * lerped_x0_3 + y_lerp_factor * lerped_x1_3;
+                            // buffer[y * size + x] += amplitude * 0.5f * 1.4142135f * (0.7071067f + out_0);
+                            // buffer[y * size + x + 1] += amplitude * 0.5f * 1.4142135f * (0.7071067f + out_1);
+                            // buffer[y * size + x + 2] += amplitude * 0.5f * 1.4142135f * (0.7071067f + out_2);
+                            // buffer[y * size + x + 3] += amplitude * 0.5f * 1.4142135f * (0.7071067f + out_3);
                         }
                     }
                 }
@@ -245,8 +349,8 @@ namespace titan {
                     }
                 }
             }
-            std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
-            std::cout << "Octave " << octave << " finished in " << (end_time - start_time).count() << "ms\n";
+            // std::chrono::milliseconds end_time = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch());
+            // std::cout << "Octave " << octave << " finished in " << (end_time - start_time).count() << "ms\n";
         }
     }
 
